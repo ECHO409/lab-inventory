@@ -81,12 +81,15 @@ button {
 }
 
 /* ============================================================
-   Layout — sidebar + main
+   Layout — sidebar + main (UPDATED)
    ============================================================ */
 .app {
   display: grid;
   grid-template-columns: 240px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  /* Locked to viewport height */
+  overflow: hidden;
+  /* Prevents outer page scrolling */
   position: relative;
 }
 
@@ -115,7 +118,9 @@ button {
 
 @media (max-width: 900px) {
   .app {
-    grid-template-columns: 1fr;
+    display: block;
+    height: auto;
+    overflow: visible;
   }
 
   .mobile-menu-btn {
@@ -263,12 +268,16 @@ button {
 }
 
 /* ============================================================
-   Main
+   Main (UPDATED)
    ============================================================ */
 .main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  /* Matches viewport height */
+  overflow-y: auto;
+  /* Enables independent vertical scrolling */
   background:
     linear-gradient(180deg, rgba(247, 248, 250, 0.93), rgba(247, 248, 250, 0.96)),
     url('/static/images/nprdc-logo.png') center center / 52% auto no-repeat;
@@ -481,7 +490,6 @@ button {
 
   .breadcrumb {
     display: none;
-    /* Hide breadcrumbs on very small screens to save space */
   }
 }
 
@@ -632,7 +640,6 @@ button {
   color: var(--amber-fg);
 }
 
-/* Section tiles */
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -675,7 +682,6 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow-x: auto;
-  /* Makes table scroll sideways on mobile */
   -webkit-overflow-scrolling: touch;
 }
 
@@ -684,7 +690,6 @@ table.data {
   border-collapse: collapse;
   font-size: 13.5px;
   min-width: 600px;
-  /* Forces table to be wide enough to trigger scroll */
 }
 
 table.data thead th {
@@ -850,7 +855,6 @@ td.mono,
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-size: 14px;
-  /* 16px prevents iOS zoom */
   background: #fff;
   color: var(--ink);
   outline: none;
@@ -913,7 +917,6 @@ td.mono,
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   font-size: 16px;
-  /* Prevents iOS auto-zoom */
   color: var(--ink);
   background: #fff;
   outline: none;
@@ -1166,7 +1169,6 @@ td.mono,
   color: #1e293b;
   background: #f8fafc;
   font-size: 16px;
-  /* Prevents iOS auto-zoom */
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
 
@@ -1320,13 +1322,6 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
-
-
-/* ============================================================
-   RESPONSIVE LAYOUT — desktop preserved, mobile optimized
-   Add this block at the END of the stylesheet.
-   ============================================================ */
-
 /* Prevent accidental page-level horizontal scrolling */
 html {
   width: 100%;
@@ -1393,6 +1388,8 @@ canvas {
     width: 100%;
     min-width: 0;
     min-height: 100vh;
+    height: auto;
+    overflow-y: visible;
     background-attachment: scroll;
   }
 
@@ -1576,8 +1573,6 @@ canvas {
     flex: 0 0 auto;
   }
 
-  /* Keep complex tables usable until their HTML is updated
-     with data-label attributes for the stacked-card treatment. */
   .table-wrap {
     width: 100%;
     max-width: 100%;
@@ -1633,76 +1628,6 @@ canvas {
 
   .page-title {
     font-size: 20px;
-  }
-}
-
-/* Optional stacked inventory cards.
-   For this to work, add data-label="ID", data-label="Item", etc.
-   to each matching <td> in the HTML template. */
-@media (max-width: 600px) {
-  .table-wrap.mobile-cards {
-    overflow: visible;
-    border: 0;
-    background: transparent;
-  }
-
-  .table-wrap.mobile-cards table.data {
-    min-width: 0;
-    border-collapse: separate;
-    border-spacing: 0 12px;
-  }
-
-  .table-wrap.mobile-cards table.data thead {
-    display: none;
-  }
-
-  .table-wrap.mobile-cards table.data,
-  .table-wrap.mobile-cards table.data tbody,
-  .table-wrap.mobile-cards table.data tbody tr,
-  .table-wrap.mobile-cards table.data tbody td {
-    display: block;
-    width: 100%;
-  }
-
-  .table-wrap.mobile-cards table.data tbody tr {
-    padding: 8px 13px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--surface);
-    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.045);
-  }
-
-  .table-wrap.mobile-cards table.data tbody td {
-    display: grid;
-    grid-template-columns: minmax(82px, 0.8fr) minmax(0, 1.5fr);
-    gap: 12px;
-    align-items: center;
-    padding: 8px 2px;
-    border-bottom: 1px solid var(--border);
-    overflow-wrap: anywhere;
-  }
-
-  .table-wrap.mobile-cards table.data tbody td:last-child {
-    border-bottom: 0;
-  }
-
-  .table-wrap.mobile-cards table.data tbody td::before {
-    content: attr(data-label);
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.035em;
-  }
-
-  .table-wrap.mobile-cards table.data tbody td:empty {
-    display: none;
-  }
-
-  .table-wrap.mobile-cards table.data tbody td .btn,
-  .table-wrap.mobile-cards table.data tbody td button {
-    width: fit-content;
-    min-height: 38px;
   }
 }
 
