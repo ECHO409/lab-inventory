@@ -1,11 +1,11 @@
-from datetime import date
+ from datetime import date
 from flask_wtf import FlaskForm
 from wtforms import (StringField, PasswordField, SelectField, FloatField,
                      DateField, BooleanField, TextAreaField, SubmitField)
 from wtforms.validators import DataRequired, Optional, NumberRange, Length
 
 from models import (CATEGORIES, TRANSACTION_TYPES, UNITS,
-                    CONDITION_STATUSES)
+                    CONDITION_STATUSES, LOCATIONS)
 
 
 class LoginForm(FlaskForm):
@@ -29,7 +29,10 @@ class ItemForm(FlaskForm):
     unit = SelectField("Unit",
                        choices=[(u, u) for u in UNITS],
                        validators=[DataRequired()])
-    location = StringField("Location", validators=[Optional(), Length(max=80)])
+    # UPDATED: Changed from StringField to SelectField
+    location = SelectField("Location",
+                           choices=[("", "—")] + [(loc, loc) for loc in LOCATIONS],
+                           validators=[Optional()])
     received_date = DateField("Received / Acquired", validators=[Optional()])
     expiry_date = DateField("Expiry Date", validators=[Optional()])
     min_level = FloatField("Min Level", default=0.0)

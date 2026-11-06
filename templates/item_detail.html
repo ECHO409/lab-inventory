@@ -2,58 +2,126 @@
 {% block title %}{{ item.name }} — Lab Inventory{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <a href="{{ url_for('section', category=item.category) }}" class="text-sm text-slate-500 hover:text-slate-800">
-        &larr; {{ item.category }}
-    </a>
-    <h1 class="text-2xl font-semibold text-slate-900 mt-1">{{ item.name }}</h1>
-    <p class="text-slate-500 text-sm font-mono">{{ item.inventory_id }}</p>
-    {% if current_user.role in ('admin', 'technician') %}
-    {% if item.is_archived %}
-    <form method="post" action="{{ url_for('item_restore', item_id=item.id) }}" class="mt-3">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-secondary">Restore to inventory</button>
-    </form>
-    {% elif not item.is_archived %}
-    <form method="post" action="{{ url_for('item_archive', item_id=item.id) }}" class="mt-3">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-secondary">Move to archive</button>
-    </form>
-    {% endif %}
-    {% endif %}
+<div class="mb-6 flex justify-between items-start">
+    <div>
+        <a href="{{ url_for('section', category=item.category) }}" class="text-sm text-slate-500 hover:text-slate-800">
+            &larr; {{ item.category }}
+        </a>
+        <h1 class="text-2xl font-semibold text-slate-900 mt-1">{{ item.name }}</h1>
+        <p class="text-slate-500 text-sm font-mono">{{ item.inventory_id }}</p>
+    </div>
+
+    <!-- Edit & Archive Buttons -->
+    <div class="flex gap-2">
+        {% if current_user.role in ('admin', 'technician') %}
+        <a href="{{ url_for('item_edit', item_id=item.id) }}" class="btn btn-primary text-sm px-4 py-2">Edit Item
+            Details</a>
+
+        {% if item.is_archived %}
+        <form method="post" action="{{ url_for('item_restore', item_id=item.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary text-sm px-4 py-2">Restore</button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('item_archive', item_id=item.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary text-sm px-4 py-2">Archive</button>
+        </form>
+        {% endif %}
+        {% endif %}
+    </div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="lg:col-span-2 bg-white border border-slate-200 rounded-lg p-6">
-        <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Details</h2>
-        <dl class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-                <dt class="text-slate-500">Current Qty</dt>
-                <dd class="font-medium">{{ item.current_qty }} {{ item.unit }}</dd>
+    <!-- Details Panel -->
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white border border-slate-200 rounded-lg p-6">
+            <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Details</h2>
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-slate-500">Current Qty</dt>
+                    <dd class="font-medium text-lg">{{ item.current_qty }} {{ item.unit }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Stock Status</dt>
+                    <dd class="font-medium">{{ item.stock_status }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Expiry Status</dt>
+                    <dd class="font-medium">{{ item.expiry_status }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Service Status</dt>
+                    <dd class="font-medium">{{ item.service_status }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Area</dt>
+                    <dd class="font-medium">{{ item.area.name if item.area else '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Location</dt>
+                    <dd class="font-medium">{{ item.location or '—' }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Quick Actions (Admin/Tech only) -->
+        {% if current_user.role in ('admin', 'technician') and not item.is_archived %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- Adjust Quantity -->
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <h3 class="text-sm font-semibold text-slate-700 mb-2">Adjust Quantity</h3>
+                <p class="text-xs text-slate-500 mb-4">Use this to quickly add or remove stock. It will be logged as an
+                    adjustment.</p>
+                <form method="POST" action="{{ url_for('item_transaction', item_id=item.id) }}" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="trans_date" value="{{ date.today() }}">
+                    <input type="hidden" name="unit" value="{{ item.unit }}">
+
+                    <div>
+                        <select name="trans_type" class="w-full border border-slate-300 rounded p-2 text-sm">
+                            <option value="ADJUSTMENT IN">Add Stock (+)</option>
+                            <option value="ADJUSTMENT OUT">Remove Stock (-)</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="number" step="any" min="0.01" name="qty_in" placeholder="Qty (e.g. 5)"
+                            class="w-full border border-slate-300 rounded p-2 text-sm" required>
+                        <input type="hidden" name="qty_out" value="0">
+                    </div>
+                    <div>
+                        <input type="text" name="reference_notes" placeholder="Reason (required)"
+                            class="w-full border border-slate-300 rounded p-2 text-sm" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full text-sm">Update Quantity</button>
+                </form>
             </div>
-            <div>
-                <dt class="text-slate-500">Stock Status</dt>
-                <dd class="font-medium">{{ item.stock_status }}</dd>
+
+            <!-- Shift Area -->
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <h3 class="text-sm font-semibold text-slate-700 mb-2">Shift Area</h3>
+                <p class="text-xs text-slate-500 mb-4">Move this item to a different lab area.</p>
+                <form method="POST" action="{{ url_for('item_location_update', item_id=item.id) }}" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div>
+                        <select name="location" class="w-full border border-slate-300 rounded p-2 text-sm">
+                            <option value="">— Select New Location —</option>
+                            <option value="Shelf">Shelf</option>
+                            <option value="Fridge">Fridge</option>
+                            <option value="Bench">Bench</option>
+                            <option value="Drawer">Drawer</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary w-full text-sm mt-4">Update Location</button>
+                </form>
             </div>
-            <div>
-                <dt class="text-slate-500">Expiry Status</dt>
-                <dd class="font-medium">{{ item.expiry_status }}</dd>
-            </div>
-            <div>
-                <dt class="text-slate-500">Service Status</dt>
-                <dd class="font-medium">{{ item.service_status }}</dd>
-            </div>
-            <div>
-                <dt class="text-slate-500">Area</dt>
-                <dd class="font-medium">{{ item.area.name if item.area else '—' }}</dd>
-            </div>
-            <div>
-                <dt class="text-slate-500">Location</dt>
-                <dd class="font-medium">{{ item.location or '—' }}</dd>
-            </div>
-        </dl>
+
+        </div>
+        {% endif %}
     </div>
 
+    <!-- History Panel -->
     <div class="bg-white border border-slate-200 rounded-lg p-6">
         <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">History</h2>
         {% if item.transactions %}

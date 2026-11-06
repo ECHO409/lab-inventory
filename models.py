@@ -1,4 +1,4 @@
-from datetime import datetime, date
+ from datetime import datetime, date
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from argon2 import PasswordHasher
@@ -72,10 +72,8 @@ CONDITION_STATUSES = [
     "Awaiting Repair", "Awaiting Disposal", "Disposed / Decommissioned",
 ]
 
-LOCATIONS = [
-    "Main Store", "Cold Room", "Refrigerator", "Freezer", "Bench",
-    "Cabinet", "Equipment Room", "Office / Records", "Other",
-]
+# UPDATED LOCATIONS HERE:
+LOCATIONS = ["Shelf", "Fridge", "Bench", "Drawer"]
 
 
 class Item(db.Model):
