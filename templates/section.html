@@ -80,13 +80,24 @@
                 <td>{{ it.unit }}</td>
                 <td>
                     {% if current_user.role in ('admin', 'technician') %}
-                    <form method="post" class="location-inline-form" action="{{ url_for('item_location_update', item_id=it.id) }}">
+                    <form method="post" class="location-inline-form"
+                        action="{{ url_for('item_location_update', item_id=it.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="show" value="{{ show }}">
                         <input type="hidden" name="area" value="{{ area_id or '' }}">
                         <input type="hidden" name="q" value="{{ q }}">
                         <input type="hidden" name="page" value="{{ page_obj.page }}">
-                        <input type="text" name="location" value="{{ it.location or '' }}" maxlength="80" placeholder="Shelf, fridge, bench…" aria-label="Location for {{ it.name }}">
+                        <select name="location" aria-label="Location for {{ it.name }}">
+                            {% if it.location and it.location not in LOCATIONS %}
+                            <option value="{{ it.location }}" selected>{{ it.location }}</option>
+                            {% else %}
+                            <option value="">—</option>
+                            {% endif %}
+                            {% for location in LOCATIONS %}
+                            <option value="{{ location }}" {% if it.location==location %}selected{% endif %}>{{ location
+                                }}</option>
+                            {% endfor %}
+                        </select>
                         <button type="submit" class="btn btn-secondary btn-sm">Save</button>
                     </form>
                     {% else %}{{ it.location or '—' }}{% endif %}
@@ -114,7 +125,8 @@
                 </td>
                 {% if current_user.role in ('admin', 'technician') %}
                 <td>
-                    <form method="post" action="{{ url_for('item_archive', item_id=it.id) }}" data-confirm="Move {{ it.inventory_id }} to the archive?">
+                    <form method="post" action="{{ url_for('item_archive', item_id=it.id) }}"
+                        data-confirm="Move {{ it.inventory_id }} to the archive?">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-secondary btn-sm">Archive</button>
                     </form>
@@ -131,11 +143,13 @@
 {% if page_obj.pages > 1 %}
 <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 4px;">
     {% if page_obj.has_prev %}
-    <a class="btn btn-secondary" href="{{ url_for('section', category=category, show=show, area=area_id, q=q, page=page_obj.prev_num) }}">Previous</a>
+    <a class="btn btn-secondary"
+        href="{{ url_for('section', category=category, show=show, area=area_id, q=q, page=page_obj.prev_num) }}">Previous</a>
     {% else %}<span></span>{% endif %}
     <span class="text-sm">Page {{ page_obj.page }} of {{ page_obj.pages }} · {{ page_obj.total }} items</span>
     {% if page_obj.has_next %}
-    <a class="btn btn-secondary" href="{{ url_for('section', category=category, show=show, area=area_id, q=q, page=page_obj.next_num) }}">Next</a>
+    <a class="btn btn-secondary"
+        href="{{ url_for('section', category=category, show=show, area=area_id, q=q, page=page_obj.next_num) }}">Next</a>
     {% else %}<span></span>{% endif %}
 </div>
 {% endif %}

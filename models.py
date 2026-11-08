@@ -72,8 +72,7 @@ CONDITION_STATUSES = [
     "Awaiting Repair", "Awaiting Disposal", "Disposed / Decommissioned",
 ]
 
-# UPDATED LOCATIONS HERE:
-LOCATIONS = ["Shelf", "Fridge", "Bench", "Drawer"]
+LOCATIONS = ["Shelf", "Bench", "Fridge"]
 
 
 class Item(db.Model):

@@ -2,118 +2,127 @@
 {% block title %}{{ item.name }} — Lab Inventory{% endblock %}
 
 {% block content %}
-<div class="mb-6 flex justify-between items-start">
+<div class="item-detail-header">
     <div>
-        <a href="{{ url_for('section', category=item.category) }}" class="text-sm text-slate-500 hover:text-slate-800">
+        <a href="{{ url_for('section', category=item.category) }}" class="item-back-link">
             &larr; {{ item.category }}
         </a>
-        <h1 class="text-2xl font-semibold text-slate-900 mt-1">{{ item.name }}</h1>
-        <p class="text-slate-500 text-sm font-mono">{{ item.inventory_id }}</p>
+        <h1 class="item-detail-title">{{ item.name }}</h1>
+        <p class="item-detail-id">{{ item.inventory_id }}</p>
     </div>
 
     <!-- Edit & Archive Buttons -->
-    <div class="flex gap-2">
+    <div class="item-detail-actions">
         {% if current_user.role in ('admin', 'technician') %}
-        <a href="{{ url_for('item_edit', item_id=item.id) }}" class="btn btn-primary text-sm px-4 py-2">Edit Item
+        <a href="{{ url_for('item_edit', item_id=item.id) }}" class="btn btn-primary">Edit Item
             Details</a>
 
         {% if item.is_archived %}
         <form method="post" action="{{ url_for('item_restore', item_id=item.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-secondary text-sm px-4 py-2">Restore</button>
+            <button type="submit" class="btn btn-secondary">Restore</button>
         </form>
         {% else %}
         <form method="post" action="{{ url_for('item_archive', item_id=item.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-secondary text-sm px-4 py-2">Archive</button>
+            <button type="submit" class="btn btn-secondary">Archive</button>
         </form>
         {% endif %}
         {% endif %}
     </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="item-detail-layout">
     <!-- Details Panel -->
-    <div class="lg:col-span-2 space-y-6">
-        <div class="bg-white border border-slate-200 rounded-lg p-6">
-            <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Details</h2>
-            <dl class="grid grid-cols-2 gap-4 text-sm">
+    <div class="item-detail-main">
+        <div class="item-panel">
+            <h2 class="item-panel-title">Details</h2>
+            <dl class="item-facts">
                 <div>
-                    <dt class="text-slate-500">Current Qty</dt>
-                    <dd class="font-medium text-lg">{{ item.current_qty }} {{ item.unit }}</dd>
+                    <dt>Current Qty</dt>
+                    <dd class="item-current-qty">{{ item.current_qty }} {{ item.unit }}</dd>
                 </div>
                 <div>
-                    <dt class="text-slate-500">Stock Status</dt>
-                    <dd class="font-medium">{{ item.stock_status }}</dd>
+                    <dt>Stock Status</dt>
+                    <dd>{{ item.stock_status }}</dd>
                 </div>
                 <div>
-                    <dt class="text-slate-500">Expiry Status</dt>
-                    <dd class="font-medium">{{ item.expiry_status }}</dd>
+                    <dt>Expiry Status</dt>
+                    <dd>{{ item.expiry_status }}</dd>
                 </div>
                 <div>
-                    <dt class="text-slate-500">Service Status</dt>
-                    <dd class="font-medium">{{ item.service_status }}</dd>
+                    <dt>Service Status</dt>
+                    <dd>{{ item.service_status }}</dd>
                 </div>
                 <div>
-                    <dt class="text-slate-500">Area</dt>
-                    <dd class="font-medium">{{ item.area.name if item.area else '—' }}</dd>
+                    <dt>Area</dt>
+                    <dd>{{ item.area.name if item.area else '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-slate-500">Location</dt>
-                    <dd class="font-medium">{{ item.location or '—' }}</dd>
+                    <dt>Location</dt>
+                    <dd>{{ item.location or '—' }}</dd>
                 </div>
             </dl>
         </div>
 
         <!-- Quick Actions (Admin/Tech only) -->
         {% if current_user.role in ('admin', 'technician') and not item.is_archived %}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="item-quick-actions">
 
             <!-- Adjust Quantity -->
-            <div class="bg-white border border-slate-200 rounded-lg p-6">
-                <h3 class="text-sm font-semibold text-slate-700 mb-2">Adjust Quantity</h3>
-                <p class="text-xs text-slate-500 mb-4">Use this to quickly add or remove stock. It will be logged as an
+            <div class="item-panel">
+                <h3 class="item-panel-title">Adjust Quantity</h3>
+                <p class="item-panel-help">Use this to quickly add or remove stock. It will be logged as an
                     adjustment.</p>
-                <form method="POST" action="{{ url_for('item_transaction', item_id=item.id) }}" class="space-y-3">
+                <form method="POST" action="{{ url_for('item_transaction', item_id=item.id) }}"
+                    class="item-action-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="trans_date" value="{{ date.today() }}">
                     <input type="hidden" name="unit" value="{{ item.unit }}">
 
                     <div>
-                        <select name="trans_type" class="w-full border border-slate-300 rounded p-2 text-sm">
+                        <select name="trans_type" class="item-control">
                             <option value="ADJUSTMENT IN">Add Stock (+)</option>
                             <option value="ADJUSTMENT OUT">Remove Stock (-)</option>
                         </select>
                     </div>
-                    <div class="flex gap-2">
+                    <div>
                         <input type="number" step="any" min="0.01" name="qty_in" placeholder="Qty (e.g. 5)"
-                            class="w-full border border-slate-300 rounded p-2 text-sm" required>
+                            class="item-control" required>
                         <input type="hidden" name="qty_out" value="0">
                     </div>
                     <div>
-                        <input type="text" name="reference_notes" placeholder="Reason (required)"
-                            class="w-full border border-slate-300 rounded p-2 text-sm" required>
+                        <input type="text" name="reference_notes" placeholder="Reason (required)" class="item-control"
+                            required>
                     </div>
-                    <button type="submit" class="btn btn-primary w-full text-sm">Update Quantity</button>
+                    <button type="submit" class="btn btn-primary item-action-button">Update Quantity</button>
                 </form>
             </div>
 
-            <!-- Shift Area -->
-            <div class="bg-white border border-slate-200 rounded-lg p-6">
-                <h3 class="text-sm font-semibold text-slate-700 mb-2">Shift Area</h3>
-                <p class="text-xs text-slate-500 mb-4">Move this item to a different lab area.</p>
-                <form method="POST" action="{{ url_for('item_location_update', item_id=item.id) }}" class="space-y-3">
+            <!-- Move Item -->
+            <div class="item-panel">
+                <h3 class="item-panel-title">Move Item</h3>
+                <form method="POST" action="{{ url_for('item_relocate', item_id=item.id) }}" class="item-action-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
-                        <select name="location" class="w-full border border-slate-300 rounded p-2 text-sm">
-                            <option value="">— Select New Location —</option>
-                            <option value="Shelf">Shelf</option>
-                            <option value="Fridge">Fridge</option>
-                            <option value="Bench">Bench</option>
-                            <option value="Drawer">Drawer</option>
+                        <label for="move-area">Area</label>
+                        <select id="move-area" name="area_id" class="item-control" required>
+                            {% for area in areas %}
+                            <option value="{{ area.id }}" {% if item.area_id==area.id %}selected{% endif %}>{{ area.name
+                                }}</option>
+                            {% endfor %}
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-secondary w-full text-sm mt-4">Update Location</button>
+                    <div>
+                        <label for="move-location">Location</label>
+                        <select id="move-location" name="location" class="item-control" required>
+                            {% for location in locations %}
+                            <option value="{{ location }}" {% if item.location==location %}selected{% endif %}>{{
+                                location }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary item-action-button">Move Item</button>
                 </form>
             </div>
 
@@ -122,21 +131,21 @@
     </div>
 
     <!-- History Panel -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6">
-        <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">History</h2>
+    <div class="item-panel">
+        <h2 class="item-panel-title">History</h2>
         {% if item.transactions %}
-        <ul class="space-y-3 text-sm">
+        <ul class="item-history">
             {% for t in item.transactions[:10] %}
-            <li class="border-b border-slate-100 pb-2">
-                <div class="font-medium">{{ t.trans_type }}</div>
-                <div class="text-slate-500 text-xs">
+            <li>
+                <div class="item-history-type">{{ t.trans_type }}</div>
+                <div class="item-history-meta">
                     {{ t.trans_date }} · in {{ t.qty_in }} / out {{ t.qty_out }}
                 </div>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-sm text-slate-500">No movements recorded yet.</p>
+        <p class="item-panel-help">No movements recorded yet.</p>
         {% endif %}
     </div>
 </div>

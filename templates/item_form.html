@@ -56,8 +56,14 @@
     <h3 class="section-title">Stock and Levels</h3>
     <div class="form-grid-3">
         <div class="field">
+            {% if item %}
+            <label>{{ form.current_qty.label.text }}</label>
+            {{ form.current_qty() }}
+            <div class="field-help">Set the current stock balance. Changes are recorded in movement history.</div>
+            {% else %}
             <label>{{ form.opening_qty.label.text }}</label>
             {{ form.opening_qty() }}
+            {% endif %}
         </div>
         <div class="field">
             <label>{{ form.unit.label.text }}</label>

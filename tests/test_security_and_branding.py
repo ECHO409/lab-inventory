@@ -1,6 +1,6 @@
 import unittest
 
-from app import create_app
+from app import create_app, bootstrap_areas, DEFAULT_AREAS
 from models import db, User, Item, Area, Transaction
 
 
@@ -120,22 +120,97 @@ class SecurityAndBrandingTests(unittest.TestCase):
             with self.app.app_context():
                 self.assertEqual(Transaction.query.filter_by(item_id=self.item_id).count(), 0)
 
-    def test_opening_quantity_cannot_be_changed_after_creation(self):
+    def test_adjustment_out_reduces_stock(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/transaction", data={
+                "trans_type": "ADJUSTMENT OUT",
+                "qty_in": "2",
+                "qty_out": "0",
+                "unit": "each",
+                "reference_notes": "Damaged stock",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                transaction = Transaction.query.filter_by(item_id=self.item_id).one()
+                self.assertEqual(item.current_qty, 3)
+                self.assertEqual(transaction.qty_out, 2)
+
+    def test_item_can_be_moved_to_another_area_and_location(self):
+        with self.app.app_context():
+            area = Area(name="Microbio 1", sort_order=1)
+            db.session.add(area)
+            db.session.commit()
+            area_id = area.id
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/relocate", data={
+                "area_id": str(area_id),
+                "location": "Shelf",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                self.assertEqual(item.area_id, area_id)
+                self.assertEqual(item.location, "Shelf")
+
+    def test_requested_areas_and_locations_are_selectable(self):
+        with self.app.app_context():
+            bootstrap_areas(self.app)
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.get("/item/new/Apparatus")
+            self.assertEqual(response.status_code, 200)
+            page = response.get_data(as_text=True)
+            for area_name in DEFAULT_AREAS:
+                self.assertIn(area_name, page)
+            for location in ("Shelf", "Bench", "Fridge"):
+                self.assertIn(f'<option value="{location}">{location}</option>', page)
+
+    def test_opening_quantity_remains_unchanged_during_item_edit(self):
         with self.app.test_client() as client:
             self._login_admin(client)
             response = client.post(f"/item/{self.item_id}/edit", data={
                 "name": "Microscope",
                 "opening_qty": "9",
+                "current_qty": "5",
                 "unit": "each",
                 "location": "Bench",
                 "min_level": "2",
                 "reorder_level": "3",
                 "condition_status": "Active",
             })
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 302)
             with self.app.app_context():
                 item = db.session.get(Item, self.item_id)
                 self.assertEqual(item.opening_qty, 5)
+                self.assertEqual(item.current_qty, 5)
+
+    def test_admin_can_set_current_quantity_from_item_edit(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/edit", data={
+                "name": "Microscope",
+                "opening_qty": "5",
+                "current_qty": "8",
+                "unit": "each",
+                "location": "Bench",
+                "min_level": "2",
+                "reorder_level": "3",
+                "condition_status": "Active",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                transaction = Transaction.query.filter_by(item_id=self.item_id).one()
+                self.assertEqual(item.opening_qty, 5)
+                self.assertEqual(item.current_qty, 8)
+                self.assertEqual(transaction.trans_type, "ADJUSTMENT IN")
+                self.assertEqual(transaction.qty_in, 3)
+                self.assertEqual(transaction.qty_out, 0)
 
     def test_out_of_stock_item_can_be_archived_and_restored(self):
         with self.app.app_context():

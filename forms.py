@@ -26,6 +26,7 @@ class ItemForm(FlaskForm):
                                validators=[Optional(), Length(max=120)])
     lot_serial = StringField("Lot / Serial", validators=[Optional(), Length(max=120)])
     opening_qty = FloatField("Opening Qty", default=0.0)
+    current_qty = FloatField("Current Qty", validators=[Optional(), NumberRange(min=0)])
     unit = SelectField("Unit",
                        choices=[(u, u) for u in UNITS],
                        validators=[DataRequired()])

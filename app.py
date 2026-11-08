@@ -12,7 +12,7 @@ from sqlalchemy import case, func
 
 from config import Config
 from models import (db, User, Item, Transaction, Area, AuditLog,
-                    CATEGORIES)
+                    CATEGORIES, LOCATIONS)
 from forms import LoginForm, ItemForm, TransactionForm
 from auth import auth_bp, role_required
 from services import import_workbook, export_native, export_sop
@@ -58,7 +58,7 @@ def create_app(config_overrides=None):
 
     @app.context_processor
     def inject_globals():
-        return {"CATEGORIES": CATEGORIES}
+        return {"CATEGORIES": CATEGORIES, "LOCATIONS": LOCATIONS}
 
     register_routes(app)
 
@@ -86,22 +86,29 @@ def bootstrap_admin(app):
 
 
 DEFAULT_AREAS = [
-    "Biochemical Analysis",
-    "Microbio 2",
     "Preparation Lab",
-    "Preparation Room",
-    "Microbiology Lab Equipment",
-    "Microbiology Lab",
+    "Microbio 1",
+    "Microbio 2",
+    "Biochemical Analysis 1",
+    "Biochemical Analysis 2",
+    "Biochemical Analysis 3",
 ]
 
 
 def bootstrap_areas(app):
-    if Area.query.count() > 0:
-        return
+    areas_by_name = {area.name: area for area in Area.query.all()}
     for i, name in enumerate(DEFAULT_AREAS):
-        db.session.add(Area(name=name, sort_order=i))
+        area = areas_by_name.get(name)
+        if area is None:
+            area = Area(name=name)
+            db.session.add(area)
+        area.sort_order = i
+        area.is_active = True
+    for area in areas_by_name.values():
+        if area.name not in DEFAULT_AREAS:
+            area.is_active = False
     db.session.commit()
-    app.logger.info("Default areas created.")
+    app.logger.info("Default areas synchronized.")
 
 
 ID_PREFIX = {
@@ -258,7 +265,8 @@ def register_routes(app):
             per_page=50, error_out=False,
         )
 
-        areas = Area.query.order_by(Area.sort_order).all()
+        areas = (Area.query.filter_by(is_active=True)
+             .order_by(Area.sort_order).all())
 
         return render_template(
             "section.html",
@@ -282,7 +290,8 @@ def register_routes(app):
         form = ItemForm()
         form.category.data = category
         form.area_id.choices = [(0, "—")] + [
-            (a.id, a.name) for a in Area.query.order_by(Area.sort_order).all()
+            (a.id, a.name) for a in Area.query.filter_by(is_active=True)
+            .order_by(Area.sort_order).all()
         ]
 
         if form.validate_on_submit():
@@ -328,22 +337,32 @@ def register_routes(app):
         item = Item.query.get_or_404(item_id)
         form = ItemForm(obj=item)
         form.category.data = item.category
+        if request.method == "GET":
+            form.current_qty.data = item.current_qty
         form.area_id.choices = [(0, "—")] + [
-            (a.id, a.name) for a in Area.query.order_by(Area.sort_order).all()
+            (a.id, a.name) for a in Area.query.filter_by(is_active=True)
+            .order_by(Area.sort_order).all()
         ]
+        if item.area and not item.area.is_active:
+            form.area_id.choices.append((item.area.id, item.area.name))
+        form.location.choices = [("", "—")] + [(loc, loc) for loc in LOCATIONS]
+        if item.location and item.location not in LOCATIONS:
+            form.location.choices.append((item.location, item.location))
 
         if form.validate_on_submit():
-            if (form.opening_qty.data or 0.0) != (item.opening_qty or 0.0):
-                flash("The opening quantity is the starting balance. Record stock changes as movements.", "error")
+            target_qty = form.current_qty.data
+            if target_qty is None:
+                flash("Enter the current quantity.", "error")
                 return render_template("item_form.html", form=form,
                                        category=item.category, item=item)
+            previous_qty = item.current_qty
+            previous_unit = item.unit
             before = item_snapshot(item)
             item.inventory_id = (form.inventory_id.data or "").strip() or item.inventory_id
             item.name = form.name.data.strip()
             item.area_id = form.area_id.data or None
             item.manufacturer = form.manufacturer.data
             item.lot_serial = form.lot_serial.data
-            item.opening_qty = form.opening_qty.data or 0.0
             item.unit = form.unit.data
             item.location = form.location.data
             item.received_date = form.received_date.data
@@ -356,6 +375,22 @@ def register_routes(app):
             item.unit_value = form.unit_value.data or 0.0
             item.responsible = form.responsible.data
             item.notes = form.notes.data
+
+            quantity_change = target_qty - previous_qty
+            if quantity_change:
+                transaction = Transaction(
+                    item_id=item.id,
+                    trans_date=date.today(),
+                    trans_type="ADJUSTMENT IN" if quantity_change > 0 else "ADJUSTMENT OUT",
+                    qty_in=max(quantity_change, 0),
+                    qty_out=max(-quantity_change, 0),
+                    unit=previous_unit,
+                    reference_notes="Current quantity set from item edit.",
+                    user_id=current_user.id,
+                )
+                db.session.add(transaction)
+                db.session.flush()
+                log_audit("CREATE", "Transaction", transaction.id)
 
             log_audit("UPDATE", "Item", item.id, before=before, after=item_snapshot(item))
             db.session.commit()
@@ -373,11 +408,15 @@ def register_routes(app):
         item = Item.query.get_or_404(item_id)
         tx_form = TransactionForm()
         tx_form.unit.data = item.unit
-        return render_template("item_detail.html", item=item, tx_form=tx_form)
+        areas = (Area.query.filter_by(is_active=True)
+             .order_by(Area.sort_order).all())
+        return render_template("item_detail.html", item=item,
+                       tx_form=tx_form, areas=areas,
+                       locations=LOCATIONS)
 
     # ----- Log transaction ---------------------------------------------------
     @app.route("/item/<int:item_id>/transaction", methods=["POST"])
-    @role_required("admin")
+    @role_required("admin", "technician")
     def item_transaction(item_id):
         item = Item.query.filter_by(id=item_id).with_for_update().first_or_404()
         form = TransactionForm()
@@ -388,6 +427,8 @@ def register_routes(app):
 
         qty_in = form.qty_in.data or 0.0
         qty_out = form.qty_out.data or 0.0
+        if form.trans_type.data == "ADJUSTMENT OUT" and qty_in > 0 and qty_out == 0:
+            qty_out, qty_in = qty_in, 0.0
         inflow_types = {"RECEIVE", "TRANSFER IN", "RETURN", "RELEASE", "ADJUSTMENT IN"}
         outflow_types = {"ISSUE / USE", "TRANSFER OUT", "QUARANTINE", "DISPOSE", "ADJUSTMENT OUT"}
 
@@ -430,13 +471,37 @@ def register_routes(app):
         flash(f"Movement recorded for {item.inventory_id}.", "success")
         return redirect(url_for("item_detail", item_id=item.id))
 
+    @app.route("/item/<int:item_id>/relocate", methods=["POST"])
+    @role_required("admin", "technician")
+    def item_relocate(item_id):
+        item = Item.query.get_or_404(item_id)
+        area_id = request.form.get("area_id", type=int)
+        area = Area.query.filter_by(id=area_id, is_active=True).first()
+        location = request.form.get("location", "").strip()
+        if area is None:
+            flash("Choose a valid active area.", "error")
+        elif location not in LOCATIONS:
+            flash("Choose Shelf, Bench, or Fridge as the location.", "error")
+        elif area.id != item.area_id or location != (item.location or ""):
+            before = item_snapshot(item)
+            item.area_id = area.id
+            item.location = location
+            log_audit("UPDATE", "Item", item.id, before=before,
+                      after=item_snapshot(item))
+            db.session.commit()
+            flash(f"Area and location updated for {item.inventory_id}.", "success")
+        return redirect(url_for("item_detail", item_id=item.id))
+
     @app.route("/item/<int:item_id>/location", methods=["POST"])
     @role_required("admin", "technician")
     def item_location_update(item_id):
         item = Item.query.get_or_404(item_id)
         location = request.form.get("location", "").strip()
+        archived_update = request.form.get("return_to") == "archived"
         if len(location) > 80:
             flash("Location must be 80 characters or fewer.", "error")
+        elif not archived_update and location not in LOCATIONS and location != (item.location or ""):
+            flash("Choose Shelf, Bench, or Fridge as the location.", "error")
         elif location != (item.location or ""):
             before = item_snapshot(item)
             item.location = location or None
