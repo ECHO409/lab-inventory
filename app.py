@@ -410,7 +410,7 @@ def register_routes(app):
              .order_by(Area.sort_order).all())
         return render_template("item_detail.html", item=item,
                        tx_form=tx_form, areas=areas,
-                       locations=LOCATIONS)
+                       locations=LOCATIONS, today=date.today().isoformat())
 
     # ----- Log transaction ---------------------------------------------------
     @app.route("/item/<int:item_id>/transaction", methods=["POST"])

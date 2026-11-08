@@ -86,6 +86,12 @@ class SecurityAndBrandingTests(unittest.TestCase):
             "password": "StrongPass!123",
         })
 
+    def test_item_detail_page_renders(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.get(f"/item/{self.item_id}")
+            self.assertEqual(response.status_code, 200)
+
     def test_login_rejects_external_next_url(self):
         with self.app.test_client() as client:
             response = client.post(

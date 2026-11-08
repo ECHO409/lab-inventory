@@ -77,7 +77,7 @@
                 <form method="POST" action="{{ url_for('item_transaction', item_id=item.id) }}"
                     class="item-action-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="trans_date" value="{{ date.today() }}">
+                    <input type="hidden" name="trans_date" value="{{ today }}">
                     <input type="hidden" name="unit" value="{{ item.unit }}">
 
                     <div>
