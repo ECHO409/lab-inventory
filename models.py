@@ -1,4 +1,4 @@
- from datetime import datetime, date
+from datetime import datetime, date
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from argon2 import PasswordHasher
