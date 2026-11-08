@@ -1,4 +1,4 @@
- from datetime import date
+from datetime import date
 from flask_wtf import FlaskForm
 from wtforms import (StringField, PasswordField, SelectField, FloatField,
                      DateField, BooleanField, TextAreaField, SubmitField)
