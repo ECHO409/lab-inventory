@@ -38,8 +38,8 @@
                     </a>
                 </td>
                 <td>{{ t.trans_type }}</td>
-                <td class="num">{{ t.qty_in or '' }}</td>
-                <td class="num">{{ t.qty_out or '' }}</td>
+                <td class="num">{{ t.qty_in|quantity if t.qty_in else '' }}</td>
+                <td class="num">{{ t.qty_out|quantity if t.qty_out else '' }}</td>
                 <td>{{ t.user.username if t.user else '—' }}</td>
                 <td class="muted" style="font-size:12.5px;">{{ t.reference_notes or '' }}</td>
             </tr>

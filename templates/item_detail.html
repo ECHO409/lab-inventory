@@ -40,7 +40,7 @@
             <dl class="item-facts">
                 <div>
                     <dt>Current Qty</dt>
-                    <dd class="item-current-qty">{{ item.current_qty }} {{ item.unit }}</dd>
+                    <dd class="item-current-qty">{{ item.current_qty|quantity }} {{ item.unit }}</dd>
                 </div>
                 <div>
                     <dt>Stock Status</dt>
@@ -91,10 +91,6 @@
                             class="item-control" required>
                         <input type="hidden" name="qty_out" value="0">
                     </div>
-                    <div>
-                        <input type="text" name="reference_notes" placeholder="Reason (required)" class="item-control"
-                            required>
-                    </div>
                     <button type="submit" class="btn btn-primary item-action-button">Update Quantity</button>
                 </form>
             </div>
@@ -139,7 +135,7 @@
             <li>
                 <div class="item-history-type">{{ t.trans_type }}</div>
                 <div class="item-history-meta">
-                    {{ t.trans_date }} · in {{ t.qty_in }} / out {{ t.qty_out }}
+                    {{ t.trans_date }} · in {{ t.qty_in|quantity }} / out {{ t.qty_out|quantity }}
                 </div>
             </li>
             {% endfor %}

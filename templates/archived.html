@@ -38,15 +38,17 @@
                 <td>{{ it.name }}</td>
                 <td>{{ it.category }}</td>
                 <td>{{ it.area.name if it.area else '—' }}</td>
-                <td class="num">{{ it.current_qty }}</td>
+                <td class="num">{{ it.current_qty|quantity }}</td>
                 <td>{{ it.unit }}</td>
                 <td>
                     {% if current_user.role in ('admin', 'technician') %}
-                    <form method="post" class="location-inline-form" action="{{ url_for('item_location_update', item_id=it.id) }}">
+                    <form method="post" class="location-inline-form"
+                        action="{{ url_for('item_location_update', item_id=it.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="return_to" value="archived">
                         <input type="hidden" name="page" value="{{ page_obj.page }}">
-                        <input type="text" name="location" value="{{ it.location or '' }}" maxlength="80" placeholder="Archive shelf, cabinet…" aria-label="Location for {{ it.name }}">
+                        <input type="text" name="location" value="{{ it.location or '' }}" maxlength="80"
+                            placeholder="Archive shelf, cabinet…" aria-label="Location for {{ it.name }}">
                         <button type="submit" class="btn btn-secondary btn-sm">Save</button>
                     </form>
                     {% else %}{{ it.location or '—' }}{% endif %}

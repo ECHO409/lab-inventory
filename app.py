@@ -1,5 +1,6 @@
 from datetime import date, datetime
 import json
+from decimal import Decimal
 from flask import (Flask, render_template, redirect, url_for, flash,
                    request, abort, send_file)
 from flask_login import LoginManager, login_required, current_user
@@ -59,6 +60,10 @@ def create_app(config_overrides=None):
     @app.context_processor
     def inject_globals():
         return {"CATEGORIES": CATEGORIES, "LOCATIONS": LOCATIONS}
+
+    @app.template_filter("quantity")
+    def format_quantity(value):
+        return format(Decimal(str(value or 0)).normalize(), "f")
 
     register_routes(app)
 
@@ -444,9 +449,9 @@ def register_routes(app):
             flash(f"This item is measured in {item.unit}. Use that unit for the movement.", "error")
             return redirect(url_for("item_detail", item_id=item.id))
 
-        if form.trans_type.data.startswith("ADJUSTMENT") and not (form.reference_notes.data or "").strip():
-            flash("Add a note explaining the reason for this adjustment.", "error")
-            return redirect(url_for("item_detail", item_id=item.id))
+        reference_notes = (form.reference_notes.data or "").strip()
+        if form.trans_type.data.startswith("ADJUSTMENT") and not reference_notes:
+            reference_notes = "Quick stock adjustment."
 
         tx = Transaction(
             item_id=item.id,
@@ -458,7 +463,7 @@ def register_routes(app):
             from_location=form.from_location.data,
             to_location=form.to_location.data,
             trans_ref=form.trans_ref.data,
-            reference_notes=form.reference_notes.data,
+            reference_notes=reference_notes,
             user_id=current_user.id,
         )
         db.session.add(tx)

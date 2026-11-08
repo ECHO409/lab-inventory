@@ -87,10 +87,39 @@ class SecurityAndBrandingTests(unittest.TestCase):
         })
 
     def test_item_detail_page_renders(self):
+        with self.app.app_context():
+            item = db.session.get(Item, self.item_id)
+            item.opening_qty = 2.0
+            item.unit = "pcs"
+            db.session.commit()
+
         with self.app.test_client() as client:
             self._login_admin(client)
             response = client.get(f"/item/{self.item_id}")
             self.assertEqual(response.status_code, 200)
+            self.assertIn('class="item-current-qty">2 pcs</dd>',
+                          response.get_data(as_text=True))
+
+    def test_current_quantity_preserves_decimal_precision(self):
+        with self.app.app_context():
+            item = db.session.get(Item, self.item_id)
+            item.opening_qty = 0.1
+            db.session.add(Transaction(
+                item_id=item.id,
+                trans_type="RECEIVE",
+                qty_in=0.2,
+                qty_out=0,
+                unit="each",
+            ))
+            db.session.commit()
+            self.assertEqual(item.current_qty, 0.3)
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.get(f"/item/{self.item_id}")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('class="item-current-qty">0.3 each</dd>',
+                          response.get_data(as_text=True))
 
     def test_login_rejects_external_next_url(self):
         with self.app.test_client() as client:
@@ -135,7 +164,6 @@ class SecurityAndBrandingTests(unittest.TestCase):
                 "qty_in": "2",
                 "qty_out": "0",
                 "unit": "each",
-                "reference_notes": "Damaged stock",
             })
             self.assertEqual(response.status_code, 302)
             with self.app.app_context():
@@ -143,6 +171,31 @@ class SecurityAndBrandingTests(unittest.TestCase):
                 transaction = Transaction.query.filter_by(item_id=self.item_id).one()
                 self.assertEqual(item.current_qty, 3)
                 self.assertEqual(transaction.qty_out, 2)
+                self.assertEqual(transaction.reference_notes, "Quick stock adjustment.")
+
+    def test_adjustment_in_without_reason_updates_stock(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/transaction", data={
+                "trans_type": "ADJUSTMENT IN",
+                "qty_in": "1",
+                "qty_out": "0",
+                "unit": "each",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                transaction = Transaction.query.filter_by(item_id=self.item_id).one()
+                self.assertEqual(item.current_qty, 6)
+                self.assertEqual(transaction.qty_in, 1)
+                self.assertEqual(transaction.reference_notes, "Quick stock adjustment.")
+
+    def test_quick_adjustment_form_has_no_reason_field(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.get(f"/item/{self.item_id}")
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn('name="reference_notes"', response.get_data(as_text=True))
 
     def test_item_can_be_moved_to_another_area_and_location(self):
         with self.app.app_context():

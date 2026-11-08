@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from decimal import Decimal
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from argon2 import PasswordHasher
@@ -123,7 +124,16 @@ class Item(db.Model):
 
     @hybrid_property
     def current_qty(self):
-        return (self.opening_qty or 0) + self.qty_in - self.qty_out
+        opening_qty = Decimal(str(self.opening_qty or 0))
+        qty_in = sum(
+            (Decimal(str(transaction.qty_in or 0)) for transaction in self.transactions),
+            Decimal("0"),
+        )
+        qty_out = sum(
+            (Decimal(str(transaction.qty_out or 0)) for transaction in self.transactions),
+            Decimal("0"),
+        )
+        return float(opening_qty + qty_in - qty_out)
 
     @current_qty.expression
     def current_qty(cls):

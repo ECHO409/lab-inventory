@@ -76,7 +76,7 @@
                     </a>
                 </td>
                 <td>{{ it.area.name if it.area else '—' }}</td>
-                <td class="num">{{ it.current_qty }}</td>
+                <td class="num">{{ it.current_qty|quantity }}</td>
                 <td>{{ it.unit }}</td>
                 <td>
                     {% if current_user.role in ('admin', 'technician') %}
