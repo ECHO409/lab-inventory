@@ -1,4 +1,5 @@
 import unittest
+from datetime import date
 
 from app import create_app, bootstrap_areas, DEFAULT_AREAS
 from models import db, User, Item, Area, Transaction
@@ -211,6 +212,37 @@ class SecurityAndBrandingTests(unittest.TestCase):
                 self.assertEqual(transaction.trans_type, "ADJUSTMENT IN")
                 self.assertEqual(transaction.qty_in, 3)
                 self.assertEqual(transaction.qty_out, 0)
+
+    def test_edit_form_has_numeric_quantity_and_hides_expiry(self):
+        with self.app.app_context():
+            item = db.session.get(Item, self.item_id)
+            item.expiry_date = date(2027, 5, 1)
+            db.session.commit()
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.get(f"/item/{self.item_id}/edit")
+            self.assertEqual(response.status_code, 200)
+            page = response.get_data(as_text=True)
+            self.assertIn('id="current_qty"', page)
+            self.assertIn('name="current_qty"', page)
+            self.assertIn('type="number"', page)
+            self.assertNotIn('name="expiry_date"', page)
+
+            response = client.post(f"/item/{self.item_id}/edit", data={
+                "name": "Microscope",
+                "opening_qty": "5",
+                "current_qty": "5",
+                "unit": "each",
+                "location": "Bench",
+                "min_level": "2",
+                "reorder_level": "3",
+                "condition_status": "Active",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                self.assertEqual(item.expiry_date, date(2027, 5, 1))
 
     def test_out_of_stock_item_can_be_archived_and_restored(self):
         with self.app.app_context():

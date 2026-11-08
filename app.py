@@ -307,7 +307,6 @@ def register_routes(app):
             item.unit = form.unit.data
             item.location = form.location.data
             item.received_date = form.received_date.data
-            item.expiry_date = form.expiry_date.data
             item.min_level = form.min_level.data or 0.0
             item.reorder_level = form.reorder_level.data or 0.0
             item.critical = bool(form.critical.data)
@@ -366,7 +365,6 @@ def register_routes(app):
             item.unit = form.unit.data
             item.location = form.location.data
             item.received_date = form.received_date.data
-            item.expiry_date = form.expiry_date.data
             item.min_level = form.min_level.data or 0.0
             item.reorder_level = form.reorder_level.data or 0.0
             item.critical = bool(form.critical.data)

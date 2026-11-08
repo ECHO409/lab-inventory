@@ -35,7 +35,6 @@ class ItemForm(FlaskForm):
                            choices=[("", "—")] + [(loc, loc) for loc in LOCATIONS],
                            validators=[Optional()])
     received_date = DateField("Received / Acquired", validators=[Optional()])
-    expiry_date = DateField("Expiry Date", validators=[Optional()])
     min_level = FloatField("Min Level", default=0.0)
     reorder_level = FloatField("Reorder Level", default=0.0)
     critical = BooleanField("Critical?")
