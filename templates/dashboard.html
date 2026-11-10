@@ -25,32 +25,24 @@
         <div class="kpi-value warn">{{ reorder + below_min }}</div>
     </div>
     <div class="kpi">
-        <div class="kpi-label">Critical Stock</div>
-        <div class="kpi-value danger">{{ critical }}</div>
-    </div>
-    <div class="kpi">
         <div class="kpi-label">Near Expiry (≤90 days)</div>
         <div class="kpi-value warn">{{ near_expiry }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Expired</div>
+        <div class="kpi-value danger">{{ expired }}</div>
     </div>
 </div>
 
 <!-- KPIs row 2 -->
 <div class="kpi-grid">
     <div class="kpi">
-        <div class="kpi-label">Expired</div>
-        <div class="kpi-value danger">{{ expired }}</div>
-    </div>
-    <div class="kpi">
-        <div class="kpi-label">Service Due / Overdue</div>
-        <div class="kpi-value">{{ service_due_30 + service_overdue }}</div>
-    </div>
-    <div class="kpi">
-        <div class="kpi-label">Total Stock Value</div>
-        <div class="kpi-value">${{ "{:,.2f}".format(total_value) }}</div>
-    </div>
-    <div class="kpi">
         <div class="kpi-label">Items OK</div>
         <div class="kpi-value">{{ ok }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Chemical / Reagent Expiring Soon</div>
+        <div class="kpi-value warn">{{ near_expiry }}</div>
     </div>
 </div>
 

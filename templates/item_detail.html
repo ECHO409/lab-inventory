@@ -17,6 +17,14 @@
         <a href="{{ url_for('item_edit', item_id=item.id) }}" class="btn btn-primary">Edit Item
             Details</a>
 
+        {% if current_user.role == 'admin' %}
+        <form method="post" action="{{ url_for('item_delete', item_id=item.id) }}"
+            onsubmit="return confirm('Permanently delete this item from the system?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger">Delete Permanently</button>
+        </form>
+        {% endif %}
+
         {% if item.is_archived %}
         <form method="post" action="{{ url_for('item_restore', item_id=item.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -46,10 +54,19 @@
                     <dt>Stock Status</dt>
                     <dd>{{ item.stock_status }}</dd>
                 </div>
+                {% if item.category in ['Chemical', 'Reagent'] %}
                 <div>
                     <dt>Expiry Status</dt>
                     <dd>{{ item.expiry_status }}</dd>
                 </div>
+                <div>
+                    <dt>Expiry Countdown</dt>
+                    <dd>
+                        {% if item.days_to_expiry is none %}N/A
+                        {% elif item.days_to_expiry < 0 %}Expired {{ (-item.days_to_expiry) }} day(s) ago {% else %}{{
+                            item.days_to_expiry }} day(s) remaining{% endif %} </dd>
+                </div>
+                {% endif %}
                 <div>
                     <dt>Service Status</dt>
                     <dd>{{ item.service_status }}</dd>

@@ -376,6 +376,92 @@ class SecurityAndBrandingTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn("Total Inventory Lines", response.get_data(as_text=True))
 
+    def test_duplicate_item_in_same_area_is_rejected(self):
+        with self.app.app_context():
+            area = Area.query.first()
+            Item(
+                inventory_id="RGT-001",
+                name="Buffer A",
+                category="Reagent",
+                area_id=area.id,
+                opening_qty=1,
+                unit="L",
+                location="Bench",
+            ).save() if False else None
+
+        with self.app.app_context():
+            area = Area.query.first()
+            db.session.add(Item(
+                inventory_id="RGT-002",
+                name="Buffer A",
+                category="Reagent",
+                area_id=area.id,
+                opening_qty=2,
+                unit="L",
+                location="Bench",
+            ))
+            db.session.commit()
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post("/item/new/Reagent", data={
+                "name": "Buffer A",
+                "opening_qty": "3",
+                "unit": "L",
+                "location": "Bench",
+                "min_level": "0",
+                "reorder_level": "0",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                self.assertEqual(
+                    Item.query.filter_by(name="Buffer A", category="Reagent").count(),
+                    2,
+                )
+
+    def test_admin_can_delete_item_permanently(self):
+        with self.app.app_context():
+            area = Area.query.first()
+            item = Item(
+                inventory_id="CHM-001",
+                name="Acetone",
+                category="Chemical",
+                area_id=area.id,
+                opening_qty=1,
+                unit="L",
+                location="Bench",
+            )
+            db.session.add(item)
+            db.session.commit()
+            item_id = item.id
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{item_id}/delete")
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                self.assertIsNone(db.session.get(Item, item_id))
+
+    def test_expiry_controls_are_shown_only_for_chemical_and_reagent(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.get("/item/new/Reagent")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('name="expiry_date"', response.get_data(as_text=True))
+
+            response = client.get("/item/new/Apparatus")
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn('name="expiry_date"', response.get_data(as_text=True))
+
+    def test_locations_include_storage_freezers(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.get("/item/new/Reagent")
+            self.assertEqual(response.status_code, 200)
+            page = response.get_data(as_text=True)
+            for location in ("Drawer", "Bench", "-8 degree fridge", "-25 degree fridge"):
+                self.assertIn(f'<option value="{location}">{location}</option>', page)
+
 
 if __name__ == "__main__":
     unittest.main()

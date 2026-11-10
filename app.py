@@ -13,7 +13,7 @@ from sqlalchemy import case, func
 
 from config import Config
 from models import (db, User, Item, Transaction, Area, AuditLog,
-                    CATEGORIES, LOCATIONS)
+                    CATEGORIES, LOCATIONS, EXPIRY_CATEGORIES)
 from forms import LoginForm, ItemForm, TransactionForm
 from auth import auth_bp, role_required
 from services import import_workbook, export_native, export_sop
@@ -147,6 +147,23 @@ def item_snapshot(item):
         "is_archived",
     )
     return {field: getattr(item, field) for field in fields}
+
+
+def find_duplicate_item(name, category, area_id, exclude_item_id=None):
+    if not name or not category or not area_id:
+        return None
+    name = name.strip()
+    if not name:
+        return None
+    query = Item.query.filter(
+        Item.category == category,
+        Item.area_id == area_id,
+        Item.is_archived.is_(False),
+        func.lower(Item.name) == name.lower(),
+    )
+    if exclude_item_id:
+        query = query.filter(Item.id != exclude_item_id)
+    return query.first()
 
 
 def log_audit(action, entity_type=None, entity_id=None, before=None, after=None):
@@ -300,18 +317,25 @@ def register_routes(app):
         ]
 
         if form.validate_on_submit():
+            area_id = form.area_id.data or None
+            duplicate = find_duplicate_item(form.name.data, category, area_id)
+            if duplicate:
+                flash(f"{duplicate.name} already exists in this area and was not recorded again.", "warning")
+                return redirect(url_for("item_detail", item_id=duplicate.id))
+
             item = Item()
             item.category = category
             item.inventory_id = (form.inventory_id.data or "").strip() \
                                 or next_inventory_id(category)
             item.name = form.name.data.strip()
-            item.area_id = form.area_id.data or None
+            item.area_id = area_id
             item.manufacturer = form.manufacturer.data
             item.lot_serial = form.lot_serial.data
             item.opening_qty = form.opening_qty.data or 0.0
             item.unit = form.unit.data
             item.location = form.location.data
             item.received_date = form.received_date.data
+            item.expiry_date = form.expiry_date.data if category in EXPIRY_CATEGORIES else None
             item.min_level = form.min_level.data or 0.0
             item.reorder_level = form.reorder_level.data or 0.0
             item.critical = bool(form.critical.data)
@@ -354,6 +378,11 @@ def register_routes(app):
             form.location.choices.append((item.location, item.location))
 
         if form.validate_on_submit():
+            duplicate = find_duplicate_item(form.name.data, item.category, form.area_id.data or None, exclude_item_id=item.id)
+            if duplicate:
+                flash(f"{duplicate.name} already exists in this area and was not duplicated.", "warning")
+                return redirect(url_for("item_detail", item_id=duplicate.id))
+
             target_qty = form.current_qty.data
             if target_qty is None:
                 flash("Enter the current quantity.", "error")
@@ -370,6 +399,7 @@ def register_routes(app):
             item.unit = form.unit.data
             item.location = form.location.data
             item.received_date = form.received_date.data
+            item.expiry_date = form.expiry_date.data if item.category in EXPIRY_CATEGORIES else None
             item.min_level = form.min_level.data or 0.0
             item.reorder_level = form.reorder_level.data or 0.0
             item.critical = bool(form.critical.data)
@@ -531,6 +561,18 @@ def register_routes(app):
         db.session.commit()
         flash(f"{item.inventory_id} moved to the archive.", "success")
         return redirect(url_for("archived"))
+
+    @app.route("/item/<int:item_id>/delete", methods=["POST"])
+    @role_required("admin")
+    def item_delete(item_id):
+        item = Item.query.get_or_404(item_id)
+        item_ref = item.inventory_id
+        before = item_snapshot(item)
+        log_audit("DELETE", "Item", item.id, before=before)
+        db.session.delete(item)
+        db.session.commit()
+        flash(f"{item_ref} was permanently deleted from the system.", "error")
+        return redirect(url_for("index"))
 
     @app.route("/item/<int:item_id>/restore", methods=["POST"])
     @role_required("admin", "technician")

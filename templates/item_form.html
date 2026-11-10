@@ -96,6 +96,12 @@
             <label>{{ form.received_date.label.text }}</label>
             {{ form.received_date() }}
         </div>
+        {% if category in ['Chemical', 'Reagent'] %}
+        <div class="field">
+            <label>{{ form.expiry_date.label.text }}</label>
+            {{ form.expiry_date() }}
+        </div>
+        {% endif %}
         <div class="field">
             <label>{{ form.service_due.label.text }}</label>
             {{ form.service_due() }}

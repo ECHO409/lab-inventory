@@ -56,6 +56,7 @@ class Area(db.Model):
 
 
 CATEGORIES = ["Apparatus", "Equipment", "Reagent", "Chemical", "Consumable"]
+EXPIRY_CATEGORIES = ["Reagent", "Chemical"]
 
 TRANSACTION_TYPES = [
     "RECEIVE", "ISSUE / USE", "TRANSFER IN", "TRANSFER OUT",
@@ -73,7 +74,7 @@ CONDITION_STATUSES = [
     "Awaiting Repair", "Awaiting Disposal", "Disposed / Decommissioned",
 ]
 
-LOCATIONS = ["Shelf", "Bench", "Fridge"]
+LOCATIONS = ["Drawer", "Bench", "-8 degree fridge", "-25 degree fridge", "Shelf", "Fridge"]
 
 
 class Item(db.Model):
@@ -165,13 +166,13 @@ class Item(db.Model):
 
     @property
     def days_to_expiry(self):
-        if not self.expiry_date:
+        if self.category not in EXPIRY_CATEGORIES or not self.expiry_date:
             return None
         return (self.expiry_date - date.today()).days
 
     @property
     def expiry_status(self):
-        if not self.expiry_date:
+        if self.category not in EXPIRY_CATEGORIES or not self.expiry_date:
             return "N/A"
         d = (self.expiry_date - date.today()).days
         if d < 0:
