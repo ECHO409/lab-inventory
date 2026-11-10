@@ -328,6 +328,7 @@ def _import_sheet(df, user_id, sheet_name):
             unit_value=_num(_val(row, "unit_value"), 0.0),
             responsible=_clean(_val(row, "responsible")),
             notes=_clean(_val(row, "notes")),
+            is_archived=qty <= 0,
             created_by_id=user_id,
         )
         db.session.add(item)

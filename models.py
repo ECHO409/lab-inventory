@@ -147,8 +147,10 @@ class Item(db.Model):
     @hybrid_property
     def stock_status(self):
         q = self.current_qty
+        if q <= (self.min_level or 0) and self.critical:
+            return "CRITICAL"
         if q <= (self.min_level or 0):
-            return "CRITICAL" if self.critical else "BELOW MIN"
+            return "REORDER"
         if q <= (self.reorder_level or 0):
             return "REORDER"
         return "OK"
@@ -159,8 +161,8 @@ class Item(db.Model):
         minimum = func.coalesce(cls.min_level, 0.0)
         reorder = func.coalesce(cls.reorder_level, 0.0)
         return case(
-            (q <= minimum, case((cls.critical.is_(True), "CRITICAL"), else_="BELOW MIN")),
-            (q <= reorder, "REORDER"),
+            (db.and_(q <= minimum, cls.critical.is_(True)), "CRITICAL"),
+            (db.or_(q <= minimum, q <= reorder), "REORDER"),
             else_="OK",
         )
 

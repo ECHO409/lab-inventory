@@ -173,6 +173,42 @@ class SecurityAndBrandingTests(unittest.TestCase):
                 self.assertEqual(transaction.qty_out, 2)
                 self.assertEqual(transaction.reference_notes, "Quick stock adjustment.")
 
+    def test_item_is_archived_when_transaction_reduces_stock_to_zero(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/transaction", data={
+                "trans_type": "ADJUSTMENT OUT",
+                "qty_in": "5",
+                "qty_out": "0",
+                "unit": "each",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                self.assertEqual(item.current_qty, 0)
+                self.assertTrue(item.is_archived)
+
+    def test_receiving_stock_restores_archived_item(self):
+        with self.app.app_context():
+            item = db.session.get(Item, self.item_id)
+            item.opening_qty = 0
+            item.is_archived = True
+            db.session.commit()
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/transaction", data={
+                "trans_type": "RECEIVE",
+                "qty_in": "3",
+                "qty_out": "0",
+                "unit": "each",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                self.assertEqual(item.current_qty, 3)
+                self.assertFalse(item.is_archived)
+
     def test_adjustment_in_without_reason_updates_stock(self):
         with self.app.test_client() as client:
             self._login_admin(client)
@@ -272,6 +308,48 @@ class SecurityAndBrandingTests(unittest.TestCase):
                 self.assertEqual(transaction.qty_in, 3)
                 self.assertEqual(transaction.qty_out, 0)
 
+    def test_editing_quantity_to_zero_archives_item(self):
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/edit", data={
+                "name": "Microscope",
+                "current_qty": "0",
+                "unit": "each",
+                "location": "Bench",
+                "min_level": "2",
+                "reorder_level": "3",
+                "condition_status": "Active",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                self.assertEqual(item.current_qty, 0)
+                self.assertTrue(item.is_archived)
+
+    def test_editing_archived_item_to_positive_quantity_restores_it(self):
+        with self.app.app_context():
+            item = db.session.get(Item, self.item_id)
+            item.opening_qty = 0
+            item.is_archived = True
+            db.session.commit()
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            response = client.post(f"/item/{self.item_id}/edit", data={
+                "name": "Microscope",
+                "current_qty": "2",
+                "unit": "each",
+                "location": "Bench",
+                "min_level": "2",
+                "reorder_level": "3",
+                "condition_status": "Active",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, self.item_id)
+                self.assertEqual(item.current_qty, 2)
+                self.assertFalse(item.is_archived)
+
     def test_edit_form_has_numeric_quantity_and_hides_expiry(self):
         with self.app.app_context():
             item = db.session.get(Item, self.item_id)
@@ -325,7 +403,18 @@ class SecurityAndBrandingTests(unittest.TestCase):
             response = client.post(f"/item/{item_id}/restore")
             self.assertEqual(response.status_code, 302)
             with self.app.app_context():
-                self.assertFalse(db.session.get(Item, item_id).is_archived)
+                self.assertTrue(db.session.get(Item, item_id).is_archived)
+            response = client.post(f"/item/{item_id}/transaction", data={
+                "trans_type": "RECEIVE",
+                "qty_in": "1",
+                "qty_out": "0",
+                "unit": "bottle",
+            })
+            self.assertEqual(response.status_code, 302)
+            with self.app.app_context():
+                item = db.session.get(Item, item_id)
+                self.assertFalse(item.is_archived)
+                self.assertEqual(item.current_qty, 1)
 
     def test_in_stock_item_cannot_be_archived(self):
         with self.app.test_client() as client:
@@ -370,11 +459,47 @@ class SecurityAndBrandingTests(unittest.TestCase):
             self.assertIn("Page 1 of 2", response.get_data(as_text=True))
 
     def test_dashboard_uses_database_stock_summary(self):
+        with self.app.app_context():
+            db.session.add(Item(
+                inventory_id="APP-ARCHIVE",
+                name="Archived stock",
+                category="Apparatus",
+                opening_qty=0,
+                unit="each",
+                is_archived=True,
+            ))
+            db.session.commit()
+
         with self.app.test_client() as client:
             self._login_admin(client)
             response = client.get("/")
             self.assertEqual(response.status_code, 200)
-            self.assertIn("Total Inventory Lines", response.get_data(as_text=True))
+            page = response.get_data(as_text=True)
+            self.assertIn("Total Inventory Lines", page)
+            self.assertIn("Reorder</div>", page)
+            self.assertNotIn("BELOW MIN", page)
+            self.assertIn("Archived Items", page)
+            self.assertIn('href="/archived" class="kpi"', page)
+            self.assertIn(">1</div>", page)
+
+    def test_noncritical_below_min_items_use_reorder_status(self):
+        with self.app.app_context():
+            item = Item(
+                inventory_id="APP-LOW",
+                name="Low stock item",
+                category="Apparatus",
+                opening_qty=2,
+                min_level=3,
+                reorder_level=1,
+                unit="each",
+            )
+            db.session.add(item)
+            db.session.commit()
+            self.assertEqual(item.stock_status, "REORDER")
+            self.assertEqual(
+                db.session.query(Item.stock_status).filter_by(id=item.id).scalar(),
+                "REORDER",
+            )
 
     def test_duplicate_item_in_same_area_is_rejected(self):
         with self.app.app_context():

@@ -191,6 +191,17 @@ def register_routes(app):
             return {"status": "unavailable", "service": "lab-inventory"}, 503
         return {"status": "ok", "service": "lab-inventory"}, 200
 
+    def sync_archive_status(item):
+        db.session.flush()
+        db.session.expire(item, ["transactions"])
+        should_archive = item.current_qty <= 0
+        if item.is_archived == should_archive:
+            return
+        before = item_snapshot(item)
+        item.is_archived = should_archive
+        log_audit("ARCHIVE" if should_archive else "RESTORE", "Item", item.id,
+                  before=before, after=item_snapshot(item))
+
     # ----- Dashboard ---------------------------------------------------------
     @app.route("/")
     @login_required
@@ -203,7 +214,6 @@ def register_routes(app):
         summary = db.session.query(
             func.count(Item.id),
             func.coalesce(func.sum(case((stock_status == "CRITICAL", 1), else_=0)), 0),
-            func.coalesce(func.sum(case((stock_status == "BELOW MIN", 1), else_=0)), 0),
             func.coalesce(func.sum(case((stock_status == "REORDER", 1), else_=0)), 0),
             func.coalesce(func.sum(case((stock_status == "OK", 1), else_=0)), 0),
             func.coalesce(func.sum(case((Item.expiry_date < today, 1), else_=0)), 0),
@@ -212,9 +222,10 @@ def register_routes(app):
             func.coalesce(func.sum(case((Item.service_due.between(today, in_30_days), 1), else_=0)), 0),
             func.coalesce(func.sum(qty * func.coalesce(Item.unit_value, 0.0)), 0.0),
         ).filter(Item.is_archived.is_(False)).one()
-        (total_lines, critical, below_min, reorder, ok, expired,
+        (total_lines, critical, reorder, ok, expired,
          near_expiry, service_overdue, service_due_30, total_value) = summary
         total_value = round(total_value, 2)
+        archived_count = Item.query.filter_by(is_archived=True).count()
         cat_counts = dict(
             db.session.query(Item.category, func.count(Item.id))
             .filter(Item.is_archived.is_(False)).group_by(Item.category).all()
@@ -225,7 +236,6 @@ def register_routes(app):
             "dashboard.html",
             total_lines=total_lines,
             critical=critical,
-            below_min=below_min,
             reorder=reorder,
             ok=ok,
             near_expiry=near_expiry,
@@ -233,6 +243,7 @@ def register_routes(app):
             service_due_30=service_due_30,
             service_overdue=service_overdue,
             total_value=total_value,
+            archived_count=archived_count,
             cat_counts=cat_counts,
             categories=CATEGORIES,
         )
@@ -270,14 +281,14 @@ def register_routes(app):
         if show == "active":
             query = query.filter(qty > 0)
         elif show == "low":
-            query = query.filter(qty > 0, Item.stock_status.in_(("CRITICAL", "BELOW MIN", "REORDER")))
+            query = query.filter(qty > 0, Item.stock_status.in_(("CRITICAL", "REORDER")))
         elif show == "out":
             query = query.filter(qty <= 0)
 
         counts_row = db.session.query(
             func.count(Item.id),
             func.coalesce(func.sum(case((qty > 0, 1), else_=0)), 0),
-            func.coalesce(func.sum(case((db.and_(qty > 0, Item.stock_status.in_(("CRITICAL", "BELOW MIN", "REORDER"))), 1), else_=0)), 0),
+            func.coalesce(func.sum(case((db.and_(qty > 0, Item.stock_status.in_(("CRITICAL", "REORDER"))), 1), else_=0)), 0),
             func.coalesce(func.sum(case((qty <= 0, 1), else_=0)), 0),
         ).filter(Item.category == category, Item.is_archived.is_(False)).one()
         counts = {"all": counts_row[0], "active": counts_row[1],
@@ -344,6 +355,7 @@ def register_routes(app):
             item.unit_value = form.unit_value.data or 0.0
             item.responsible = form.responsible.data
             item.notes = form.notes.data
+            item.is_archived = item.opening_qty <= 0
             item.created_by_id = current_user.id
 
             db.session.add(item)
@@ -425,6 +437,7 @@ def register_routes(app):
                 db.session.flush()
                 log_audit("CREATE", "Transaction", transaction.id)
 
+            sync_archive_status(item)
             log_audit("UPDATE", "Item", item.id, before=before, after=item_snapshot(item))
             db.session.commit()
 
@@ -499,6 +512,7 @@ def register_routes(app):
         db.session.add(tx)
         db.session.flush()
         log_audit("CREATE", "Transaction", tx.id)
+        sync_archive_status(item)
         db.session.commit()
 
         flash(f"Movement recorded for {item.inventory_id}.", "success")
@@ -555,6 +569,9 @@ def register_routes(app):
     @role_required("admin", "technician")
     def item_archive(item_id):
         item = Item.query.get_or_404(item_id)
+        if item.current_qty > 0:
+            flash("Only out-of-stock items can be archived.", "warning")
+            return redirect(url_for("item_detail", item_id=item.id))
         before = item_snapshot(item)
         item.is_archived = True
         log_audit("ARCHIVE", "Item", item.id, before=before, after=item_snapshot(item))
@@ -581,6 +598,9 @@ def register_routes(app):
         if not item.is_archived:
             flash("This item is not archived.", "warning")
             return redirect(url_for("item_detail", item_id=item.id))
+        if item.current_qty <= 0:
+            flash("Add stock before restoring this item to inventory.", "warning")
+            return redirect(url_for("archived"))
         before = item_snapshot(item)
         item.is_archived = False
         log_audit("RESTORE", "Item", item.id, before=before, after=item_snapshot(item))

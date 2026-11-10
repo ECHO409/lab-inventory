@@ -771,12 +771,6 @@ td.mono,
   border-color: var(--warn-bd);
 }
 
-.pill-below {
-  background: var(--amber-bg);
-  color: var(--amber-fg);
-  border-color: var(--amber-bd);
-}
-
 .pill-crit {
   background: var(--danger-bg);
   color: var(--danger-fg);

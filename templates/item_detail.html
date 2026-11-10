@@ -26,10 +26,12 @@
         {% endif %}
 
         {% if item.is_archived %}
+        {% if item.current_qty > 0 %}
         <form method="post" action="{{ url_for('item_restore', item_id=item.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-secondary">Restore</button>
         </form>
+        {% endif %}
         {% else %}
         <form method="post" action="{{ url_for('item_archive', item_id=item.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -83,7 +85,7 @@
         </div>
 
         <!-- Quick Actions (Admin/Tech only) -->
-        {% if current_user.role in ('admin', 'technician') and not item.is_archived %}
+        {% if current_user.role in ('admin', 'technician') %}
         <div class="item-quick-actions">
 
             <!-- Adjust Quantity -->
