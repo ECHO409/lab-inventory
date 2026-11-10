@@ -476,7 +476,7 @@ class SecurityAndBrandingTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             page = response.get_data(as_text=True)
             self.assertIn("Total Inventory Lines", page)
-            self.assertIn("Reorder</div>", page)
+            self.assertNotIn('class="kpi-label">Reorder</div>', page)
             self.assertNotIn("BELOW MIN", page)
             self.assertIn("Archived Items", page)
             self.assertIn('href="/archived" class="kpi"', page)
