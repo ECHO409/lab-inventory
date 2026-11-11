@@ -73,7 +73,6 @@
                 <th style="width:220px;">Location</th>
                 <th style="width:120px;">Stock</th>
                 <th style="width:120px;">Expiry</th>
-                {% if current_user.role in ('admin', 'technician') %}<th style="width:110px;">Actions</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -132,15 +131,6 @@
                         {{ e }}
                     </span>
                 </td>
-                {% if current_user.role in ('admin', 'technician') %}
-                <td>
-                    <form method="post" action="{{ url_for('item_archive', item_id=it.id) }}"
-                        data-confirm="Move {{ it.inventory_id }} to the archive?">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-secondary btn-sm">Archive</button>
-                    </form>
-                </td>
-                {% endif %}
             </tr>
             {% endfor %}
         </tbody>
