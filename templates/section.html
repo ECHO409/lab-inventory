@@ -41,12 +41,22 @@
 
 <!-- Tabs -->
 <div class="tabs">
+    {% if category in ['Reagent', 'Chemical'] %}
+    {% for key, label in [('active','In Stock'), ('expired','Expired Items'), ('expiring','Expire in 90 Days'),
+    ('out','Out of Stock'), ('all','All')] %}
+    <a class="tab {% if show == key %}active{% endif %}"
+        href="{{ url_for('section', category=category, show=key, area=area_id, q=q) }}">
+        {{ label }}<span class="count">{{ counts[key] }}</span>
+    </a>
+    {% endfor %}
+    {% else %}
     {% for key, label in [('active','In Stock'), ('low','Low'), ('out','Out of Stock'), ('all','All')] %}
     <a class="tab {% if show == key %}active{% endif %}"
         href="{{ url_for('section', category=category, show=key, area=area_id, q=q) }}">
         {{ label }}<span class="count">{{ counts[key] }}</span>
     </a>
     {% endfor %}
+    {% endif %}
 </div>
 
 <!-- Table -->

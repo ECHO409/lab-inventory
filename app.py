@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import json
 from decimal import Decimal
 from flask import (Flask, render_template, redirect, url_for, flash,
@@ -257,7 +257,9 @@ def register_routes(app):
             return redirect(url_for("index"))
 
         show = request.args.get("show", "active")
-        if show not in {"active", "low", "out", "all"}:
+        uses_expiry_tabs = category in EXPIRY_CATEGORIES
+        valid_show_values = {"active", "expired", "expiring", "out", "all"} if uses_expiry_tabs else {"active", "low", "out", "all"}
+        if show not in valid_show_values:
             show = "active"
         area_id = request.args.get("area", type=int)
         q = request.args.get("q", "").strip()
@@ -278,21 +280,49 @@ def register_routes(app):
             ))
 
         qty = Item.current_qty
-        if show == "active":
-            query = query.filter(qty > 0)
-        elif show == "low":
-            query = query.filter(qty > 0, Item.stock_status.in_(("CRITICAL", "REORDER")))
-        elif show == "out":
-            query = query.filter(qty <= 0)
+        today = date.today()
+        ninety_days = today + timedelta(days=90)
 
-        counts_row = db.session.query(
-            func.count(Item.id),
-            func.coalesce(func.sum(case((qty > 0, 1), else_=0)), 0),
-            func.coalesce(func.sum(case((db.and_(qty > 0, Item.stock_status.in_(("CRITICAL", "REORDER"))), 1), else_=0)), 0),
-            func.coalesce(func.sum(case((qty <= 0, 1), else_=0)), 0),
-        ).filter(Item.category == category, Item.is_archived.is_(False)).one()
-        counts = {"all": counts_row[0], "active": counts_row[1],
-                  "low": counts_row[2], "out": counts_row[3]}
+        if uses_expiry_tabs:
+            if show == "active":
+                query = query.filter(qty > 0)
+            elif show == "expired":
+                query = query.filter(Item.expiry_date.is_not(None), Item.expiry_date < today)
+            elif show == "expiring":
+                query = query.filter(
+                    Item.expiry_date.is_not(None),
+                    Item.expiry_date >= today,
+                    Item.expiry_date <= ninety_days,
+                )
+            elif show == "out":
+                query = query.filter(qty <= 0)
+        else:
+            if show == "active":
+                query = query.filter(qty > 0)
+            elif show == "low":
+                query = query.filter(qty > 0, Item.stock_status.in_(("CRITICAL", "REORDER")))
+            elif show == "out":
+                query = query.filter(qty <= 0)
+
+        if uses_expiry_tabs:
+            counts_row = db.session.query(
+                func.count(Item.id),
+                func.coalesce(func.sum(case((qty > 0, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((db.and_(Item.expiry_date.is_not(None), Item.expiry_date < today), 1), else_=0)), 0),
+                func.coalesce(func.sum(case((db.and_(Item.expiry_date.is_not(None), Item.expiry_date >= today, Item.expiry_date <= ninety_days), 1), else_=0)), 0),
+                func.coalesce(func.sum(case((qty <= 0, 1), else_=0)), 0),
+            ).filter(Item.category == category, Item.is_archived.is_(False)).one()
+            counts = {"all": counts_row[0], "active": counts_row[1],
+                      "expired": counts_row[2], "expiring": counts_row[3], "out": counts_row[4]}
+        else:
+            counts_row = db.session.query(
+                func.count(Item.id),
+                func.coalesce(func.sum(case((qty > 0, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((db.and_(qty > 0, Item.stock_status.in_(("CRITICAL", "REORDER"))), 1), else_=0)), 0),
+                func.coalesce(func.sum(case((qty <= 0, 1), else_=0)), 0),
+            ).filter(Item.category == category, Item.is_archived.is_(False)).one()
+            counts = {"all": counts_row[0], "active": counts_row[1],
+                      "low": counts_row[2], "out": counts_row[3]}
         page_obj = query.order_by(Item.name).paginate(
             page=max(request.args.get("page", 1, type=int), 1),
             per_page=50, error_out=False,

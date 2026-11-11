@@ -1,5 +1,5 @@
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 from app import create_app, bootstrap_areas, DEFAULT_AREAS
 from models import db, User, Item, Area, Transaction
@@ -79,6 +79,14 @@ class SecurityAndBrandingTests(unittest.TestCase):
             self.assertIn("Midlands State University", text)
             self.assertIn("National Pathology Research and Diagnostic Centre", text)
             self.assertIn("MSU NPRDC", text)
+
+    def test_login_page_has_no_decorative_icons(self):
+        with self.app.test_client() as client:
+            response = client.get("/login")
+            self.assertEqual(response.status_code, 200)
+            text = response.get_data(as_text=True)
+            self.assertNotIn("login-input-icon", text)
+            self.assertNotIn("<svg", text)
 
     def _login_admin(self, client):
         return client.post("/login", data={
@@ -481,6 +489,46 @@ class SecurityAndBrandingTests(unittest.TestCase):
             self.assertIn("Archived Items", page)
             self.assertIn('href="/archived" class="kpi"', page)
             self.assertIn(">1</div>", page)
+
+    def test_reagent_and_chemical_sections_use_expiry_tabs(self):
+        with self.app.app_context():
+            area = Area.query.first()
+            expired = Item(
+                inventory_id="RGT-EXPIRED",
+                name="Expired Reagent",
+                category="Reagent",
+                area_id=area.id,
+                opening_qty=2,
+                unit="L",
+                location="Bench",
+                expiry_date=date(2024, 1, 1),
+            )
+            expiring = Item(
+                inventory_id="CHM-EXPIRING",
+                name="Expiring Chemical",
+                category="Chemical",
+                area_id=area.id,
+                opening_qty=3,
+                unit="L",
+                location="Bench",
+                expiry_date=date.today() + timedelta(days=45),
+            )
+            db.session.add_all([expired, expiring])
+            db.session.commit()
+
+        with self.app.test_client() as client:
+            self._login_admin(client)
+            expired_response = client.get("/section/Reagent?show=expired")
+            self.assertEqual(expired_response.status_code, 200)
+            page = expired_response.get_data(as_text=True)
+            self.assertIn("Expired Items", page)
+            self.assertIn("Expired Reagent", page)
+
+            expiring_response = client.get("/section/Chemical?show=expiring")
+            self.assertEqual(expiring_response.status_code, 200)
+            page = expiring_response.get_data(as_text=True)
+            self.assertIn("Expire in 90 Days", page)
+            self.assertIn("Expiring Chemical", page)
 
     def test_noncritical_below_min_items_use_reorder_status(self):
         with self.app.app_context():
