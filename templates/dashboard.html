@@ -58,36 +58,17 @@
 </div>
 
 <!-- Breakdowns -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" class="two-col">
-    <div class="card card-pad">
-        <h3 class="section-title">Stock Status Breakdown</h3>
-        <table class="data" style="border:none;">
-            <tbody>
-                <tr>
-                    <td class="num">{{ critical }}</td>
-                </tr>
-                <tr>
-                    <td class="num">{{ reorder }}</td>
-                </tr>
-                <tr>
-                    <td class="num">{{ ok }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card card-pad">
-        <h3 class="section-title">Category Breakdown</h3>
-        <table class="data" style="border:none;">
-            <tbody>
-                {% for c in categories %}
-                <tr>
-                    <td>{{ c }}</td>
-                    <td class="num">{{ cat_counts[c] }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="card card-pad" style="max-width: 720px;">
+    <h3 class="section-title">Category Breakdown</h3>
+    <table class="data" style="border:none;">
+        <tbody>
+            {% for c in categories %}
+            <tr>
+                <td>{{ c }}</td>
+                <td class="num">{{ cat_counts[c] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}
