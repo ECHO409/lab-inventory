@@ -605,6 +605,11 @@ button {
   margin-bottom: 24px;
 }
 
+.kpi-grid.kpi-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 280px;
+}
+
 .kpi {
   background: var(--surface);
   border: 1px solid var(--border);
